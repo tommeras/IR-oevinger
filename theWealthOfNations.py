@@ -3,7 +3,8 @@ import codecs;
 import string;
 from nltk.stem.porter import PorterStemmer;
 import gensim;
-from gensim import corpora
+from gensim import corpora;
+
 
 
 
@@ -31,7 +32,7 @@ def splitChapters(liste):
                 newList.append(t)
     return newList
 
-def splitOnWhiteSpace(text):
+def tokenizeSplitAndStripText(text):
     tempWordsInList=[]
     wordsInList = []
     listOfLines = text.split("\r\n")
@@ -55,17 +56,50 @@ for par in parList:
 parListSplitInWords=[]
 
 for par in parListWithoutGutenberg:
-    tempParListSplitInWord = splitOnWhiteSpace(par)
+    tempParListSplitInWord = tokenizeSplitAndStripText(par)
     if len(tempParListSplitInWord) != 0:
         parListSplitInWords.append(tempParListSplitInWord) 
 
-dictionary = gensim.corpora.Dictionary(parListSplitInWords)
+
+def stemListOfWords(list): 
+    newList=[]
+    for word in list:
+        newList.append(stemmer.stem(word))
+    return newList
+
 listOfStopWords = ['a','able','about','across','after','all','almost','also','am','among','an','and','any','are','as','at','be','because','been','but','by','can','cannot','could','dear','did','do','does','either','else','ever','every','for','from','get','got','had','has','have','he','her','hers','him','his','how','however','i','if','in','into','is','it','its','just','least','let','like','likely','may','me','might','most','must','my','neither','no','nor','not','of','off','often','on','only','or','other','our','own','rather','said','say','says','she','should','since','so','some','than','that','the','their','them','then','there','these','they','this','tis','to','too','twas','us','wants','was','we','were','what','when','where','which','while','who','whom','why','will','with','would','yet','you','your']
+stemmedListOfStopWords = stemListOfWords(listOfStopWords)
+dictionary = gensim.corpora.Dictionary(parListSplitInWords)
 stopIds=[]
-for word in listOfStopWords:
-    txt=stemmer.stem(word) 
-    if txt in dictionary.token2id:  
-        stopIds.append(dictionary.token2id[txt])
+for word in stemmedListOfStopWords:
+    if word in dictionary.token2id:  
+        stopIds.append(dictionary.token2id[word])
 dictionary.filter_tokens(stopIds)
-new_vec = dictionary.doc2bow(text.lower().split())
-print(new_vec)
+new_vec = [dictionary.doc2bow(par.lower().split()) for par in parList]
+
+
+def removeStopWordsFromList(list): 
+    newList=[]
+    for word in list: 
+        if word not in stemmedListOfStopWords: 
+            newList.append(word)
+    return newList
+
+tfidf_model = gensim.models.TfidfModel(new_vec)
+print(tfidf_model)
+tfidf_corpus = tfidf_model[new_vec]
+print(tfidf_corpus[1])
+index = gensim.similarities.MatrixSimilarity(tfidf_corpus)
+lsi_model = gensim.models.LsiModel(tfidf_corpus, id2word=dictionary, num_topics=100)
+lsi_corpus = lsi_model[new_vec]
+lsiIndex = gensim.similarities.MatrixSimilarity(lsi_corpus)
+
+
+def preprocessing(query): 
+    tempQue = tokenizeSplitAndStripText(query)
+    que = removeStopWordsFromList(tempQue)
+    return que
+query = preprocessing("What is the function of money?")
+print(query)
+query = dictionary.doc2bow(query) 
+print(query)
